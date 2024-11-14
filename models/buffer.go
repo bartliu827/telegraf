@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/metric"
@@ -53,7 +54,7 @@ type BufferStats struct {
 }
 
 // NewBuffer returns a new empty Buffer with the given capacity.
-func NewBuffer(name, id, alias string, capacity int, strategy, path string) (Buffer, error) {
+func NewBuffer(name, id, alias string, capacity int, strategy, path string, syncInterval time.Duration, syncMaxSize int64) (Buffer, error) {
 	registerGob()
 
 	bs := NewBufferStats(name, alias, capacity)
@@ -62,7 +63,7 @@ func NewBuffer(name, id, alias string, capacity int, strategy, path string) (Buf
 	case "", "memory":
 		return NewMemoryBuffer(capacity, bs)
 	case "disk":
-		return NewDiskBuffer(name, id, path, bs)
+		return NewDiskBuffer(name, id, path, bs, syncInterval, syncMaxSize)
 	}
 	return nil, fmt.Errorf("invalid buffer strategy %q", strategy)
 }

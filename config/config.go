@@ -288,6 +288,9 @@ type AgentConfig struct {
 	// BufferDirectory is the directory to store buffer files for serialized
 	// to disk metrics when using the "disk" buffer strategy.
 	BufferDirectory string `toml:"buffer_directory"`
+
+	BufferSyncInterval Duration `toml:"buffer_sync_interval"`
+	BufferSyncMaxSize  Size     `toml:"buffer_sync_max_size"`
 }
 
 // InputNames returns a list of strings of the configured inputs.
@@ -1567,10 +1570,12 @@ func (c *Config) buildOutput(name string, tbl *ast.Table) (*models.OutputConfig,
 		return nil, err
 	}
 	oc := &models.OutputConfig{
-		Name:            name,
-		Filter:          filter,
-		BufferStrategy:  c.Agent.BufferStrategy,
-		BufferDirectory: c.Agent.BufferDirectory,
+		Name:               name,
+		Filter:             filter,
+		BufferStrategy:     c.Agent.BufferStrategy,
+		BufferDirectory:    c.Agent.BufferDirectory,
+		BufferSyncInterval: time.Duration(c.Agent.BufferSyncInterval),
+		BufferSyncMaxSize:  int64(c.Agent.BufferSyncMaxSize),
 	}
 
 	// TODO: support FieldPass/FieldDrop on outputs

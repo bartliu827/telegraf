@@ -19,7 +19,7 @@ func TestDiskBufferRetainsTrackingInformation(t *testing.T) {
 	var delivered int
 	mm, _ := metric.WithTracking(m, func(telegraf.DeliveryInfo) { delivered++ })
 
-	buf, err := NewBuffer("test", "123", "", 0, "disk", t.TempDir())
+	buf, err := NewBuffer("test", "123", "", 0, "disk", t.TempDir(), 0, 0)
 	require.NoError(t, err)
 	buf.Stats().MetricsAdded.Set(0)
 	buf.Stats().MetricsWritten.Set(0)

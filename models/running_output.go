@@ -38,8 +38,10 @@ type OutputConfig struct {
 	NamePrefix   string
 	NameSuffix   string
 
-	BufferStrategy  string
-	BufferDirectory string
+	BufferStrategy     string
+	BufferDirectory    string
+	BufferSyncInterval time.Duration
+	BufferSyncMaxSize  int64
 
 	LogLevel string
 }
@@ -104,7 +106,7 @@ func NewRunningOutput(
 		batchSize = DefaultMetricBatchSize
 	}
 
-	b, err := NewBuffer(config.Name, config.ID, config.Alias, bufferLimit, config.BufferStrategy, config.BufferDirectory)
+	b, err := NewBuffer(config.Name, config.ID, config.Alias, bufferLimit, config.BufferStrategy, config.BufferDirectory, config.BufferSyncInterval, config.BufferSyncMaxSize)
 	if err != nil {
 		panic(err)
 	}

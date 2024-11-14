@@ -6,6 +6,7 @@ import (
 	"log"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/tidwall/wal"
 
@@ -13,6 +14,10 @@ import (
 	"github.com/influxdata/telegraf/metric"
 )
 
+// [agent]
+//
+//	buffer_sync_interval = "10s"
+//	buffer_sync_max_size = "3M"
 type DiskBuffer struct {
 	BufferStats
 	sync.Mutex
@@ -31,11 +36,16 @@ type DiskBuffer struct {
 	// we have to do our best and track that the walfile "should" be empty, so that next
 	// write, we can remove the invalid entry (also skipping this entry if it is being read).
 	isEmpty bool
+
+	bufferSyncMaxSize int64
+	writeLenFromSync  int64
 }
 
-func NewDiskBuffer(name, id, path string, stats BufferStats) (*DiskBuffer, error) {
+func NewDiskBuffer(name, id, path string, stats BufferStats, syncInterval time.Duration, syncMaxSize int64) (*DiskBuffer, error) {
 	filePath := filepath.Join(path, id)
-	walFile, err := wal.Open(filePath, nil)
+	opts := wal.DefaultOptions
+	opts.NoSync = true
+	walFile, err := wal.Open(filePath, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open wal file: %w", err)
 	}
@@ -45,15 +55,26 @@ func NewDiskBuffer(name, id, path string, stats BufferStats) (*DiskBuffer, error
 		log.Printf("I! WAL file not found for plugin outputs.%s (%s), "+
 			"this can safely be ignored if you added this plugin instance for the first time", name, id)
 	}
+	log.Printf("Open Disk Buffer name: %s path: %s sysc interval: %v, sync siize: %v", name, path, syncInterval, syncMaxSize)
 
 	buf := &DiskBuffer{
-		BufferStats: stats,
-		file:        walFile,
-		path:        filePath,
+		BufferStats:       stats,
+		file:              walFile,
+		path:              filePath,
+		bufferSyncMaxSize: syncMaxSize,
 	}
 	if buf.length() > 0 {
 		buf.originalEnd = buf.writeIndex()
 	}
+	go func(buffer *DiskBuffer) {
+		if syncInterval != 0 {
+			for {
+				time.Sleep(syncInterval)
+				buffer.file.Sync()
+			}
+		}
+	}(buf)
+
 	return buf, nil
 }
 
@@ -115,6 +136,11 @@ func (b *DiskBuffer) addSingleMetric(m telegraf.Metric) bool {
 	}
 	err = b.file.Write(b.writeIndex(), data)
 	if err == nil {
+		b.writeLenFromSync += int64(len(data))
+		if b.bufferSyncMaxSize != 0 && b.writeLenFromSync >= b.bufferSyncMaxSize {
+			b.writeLenFromSync = 0
+			b.file.Sync()
+		}
 		b.metricAdded()
 		return true
 	}
